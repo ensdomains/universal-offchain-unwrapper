@@ -10,5 +10,14 @@
   "scripts": {
     "start": "wrangler dev",
     "deploy": "wrangler publish"
+  },
+  "dependencies": {
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/address": "^5.7.0",
+    "@ethersproject/bignumber": "^5.7.0",
+    "@ethersproject/bytes": "^5.7.0",
+    "@ethersproject/providers": "^5.7.1",
+    "@ethersproject/strings": "^5.7.0",
+    "@ethersproject/transactions": "^5.7.0"
   }
 }

@@ -1,30 +1,31 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `wrangler dev src/index.ts` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `wrangler publish src/index.ts --name my-worker` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
-
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-}
+import { isAddress } from "@ethersproject/address";
+import { isBytesLike } from "@ethersproject/bytes";
+import { ccipLookup } from "./ccip";
+import { makeResponse } from "./helpers";
+import { Env } from "./types";
 
 export default {
-	async fetch(
-		request: Request,
-		env: Env,
-		ctx: ExecutionContext
-	): Promise<Response> {
-		return new Response("Hello World!");
-	},
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const senders = env.SUPPORTED_SENDERS;
+    const url = new URL(request.url);
+
+    const sender = url.pathname.split("/")[1];
+    const callData = url.pathname.split("/")[2];
+
+    if (!isAddress(sender) || !isBytesLike(callData)) {
+      return makeResponse("Invalid request format", { status: 400 });
+    }
+
+    if (senders.length > 0 && !senders.includes(sender)) {
+      return makeResponse("Sender not supported", { status: 400 });
+    }
+
+    try {
+      const lookupResult = await ccipLookup(callData);
+      return makeResponse({ data: lookupResult }, { status: 200 });
+    } catch (e: any) {
+      console.log("THROWING ERROR", e.message);
+      return makeResponse(e.message, { status: 400 });
+    }
+  },
 };
