@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "packages": {
+    "@chainlink/ccip-read-cf-worker": {
+      "signature": "db0df5cd717dc8db6967d05e4b0a4442",
+      "pure": true
+    }
+  }
+}

@@ -18,6 +18,7 @@
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.1",
     "@ethersproject/strings": "^5.7.0",
-    "@ethersproject/transactions": "^5.7.0"
+    "@ethersproject/transactions": "^5.7.0",
+    "itty-router": "^2.6.6"
   }
 }

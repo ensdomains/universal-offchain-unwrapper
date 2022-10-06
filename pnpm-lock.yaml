@@ -9,6 +9,7 @@ specifiers:
   '@ethersproject/providers': ^5.7.1
   '@ethersproject/strings': ^5.7.0
   '@ethersproject/transactions': ^5.7.0
+  itty-router: ^2.6.6
   typescript: ^4.8.4
   wrangler: 2.1.10
 
@@ -20,6 +21,7 @@ dependencies:
   '@ethersproject/providers': 5.7.1
   '@ethersproject/strings': 5.7.0
   '@ethersproject/transactions': 5.7.0
+  itty-router: 2.6.6
 
 devDependencies:
   '@cloudflare/workers-types': 3.16.0
@@ -884,6 +886,10 @@ packages:
   /isexe/2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
     dev: true
+
+  /itty-router/2.6.6:
+    resolution: {integrity: sha512-hIPHtXGymCX7Lzb2I4G6JgZFE4QEEQwst9GORK7sMYUpJvLfy4yZJr95r04e8DzoAnj6HcxM2m4TbK+juu+18g==}
+    dev: false
 
   /js-sha3/0.8.0:
     resolution: {integrity: sha512-gF1cRrHhIzNfToc802P800N8PpXS+evLLXfsVpowqmAFR9uwbi89WvXg2QspOmXL8QL86J4T1EpFu+yUkwJY3Q==}

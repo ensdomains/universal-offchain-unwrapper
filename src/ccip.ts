@@ -1,42 +1,3 @@
-import { defaultAbiCoder, Interface } from "@ethersproject/abi";
-import { BigNumber } from "@ethersproject/bignumber";
-import { hexDataSlice } from "@ethersproject/bytes";
-import { toUtf8String } from "@ethersproject/strings";
-
-function bytesPad(value: Uint8Array): Uint8Array {
-  if (value.length % 32 === 0) {
-    return value;
-  }
-
-  const result = new Uint8Array(Math.ceil(value.length / 32) * 32);
-  result.set(value);
-  return result;
-}
-
-function _parseBytes(result: string, start: number): null | string {
-  if (result === "0x") {
-    return null;
-  }
-
-  const offset = BigNumber.from(
-    hexDataSlice(result, start, start + 32)
-  ).toNumber();
-  const length = BigNumber.from(
-    hexDataSlice(result, offset, offset + 32)
-  ).toNumber();
-
-  return hexDataSlice(result, offset + 32, offset + 32 + length);
-}
-
-function _parseString(result: string, start: number): null | string {
-  try {
-    const parsed = _parseBytes(result, start);
-    if (!parsed) return null;
-    return toUtf8String(parsed);
-  } catch (error) {}
-  return null;
-}
-
 const ccipReadFetch = async (
   _sender: string,
   calldata: string,
@@ -98,31 +59,21 @@ const ccipReadFetch = async (
   );
 };
 
-const iface = new Interface([
-  "function query(tuple(address,string[],bytes)[]) returns (bytes[])",
-]);
-
-export const ccipLookup = async (callData: string) => {
-  const [callDatas] = iface.decodeFunctionData("query", callData);
+export const ccipLookup = async (callDatas: [string, string[], string][]) => {
   const responses = await Promise.all(
-    callDatas.map(
-      async ([wrappedSender, wrappedUrls, wrappedCallData]: [
-        string,
-        string[],
-        string
-      ]) => {
-        const ccipResult = await ccipReadFetch(
-          wrappedSender,
-          wrappedCallData,
-          wrappedUrls
-        );
-        if (ccipResult === null) {
-          throw new Error("CCIP Read provided no URLs");
-        }
-        return ccipResult;
+    callDatas.map(async ([wrappedSender, wrappedUrls, wrappedCallData]) => {
+      const ccipResult = await ccipReadFetch(
+        wrappedSender,
+        wrappedCallData,
+        wrappedUrls
+      );
+      if (ccipResult === null) {
+        throw new Error("CCIP Read provided no URLs");
       }
-    )
+
+      return ccipResult;
+    })
   );
 
-  return defaultAbiCoder.encode(["bytes[]"], [responses]);
+  return responses;
 };

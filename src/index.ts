@@ -1,31 +1,33 @@
-import { isAddress } from "@ethersproject/address";
-import { isBytesLike } from "@ethersproject/bytes";
+import { Server } from "@chainlink/ccip-read-cf-worker/src";
 import { ccipLookup } from "./ccip";
-import { makeResponse } from "./helpers";
 import { Env } from "./types";
+
+let supportedSenders: string[] = [];
+
+const server = new Server();
+const abi = [
+  "function query(tuple(address,string[],bytes)[]) returns (bytes[])",
+];
+server.add(abi, [
+  {
+    type: "query",
+    func: async ([callDatas], { to: sender }) => {
+      if (
+        supportedSenders.length > 0 &&
+        !supportedSenders.includes(sender as string)
+      ) {
+        throw new Error("Sender not supported");
+      }
+      const res = await ccipLookup(callDatas as [string, string[], string][]);
+      return [res];
+    },
+  },
+]);
+const app = server.makeApp("/");
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const senders = env.SUPPORTED_SENDERS;
-    const url = new URL(request.url);
-
-    const sender = url.pathname.split("/")[1];
-    const callData = url.pathname.split("/")[2];
-
-    if (!isAddress(sender) || !isBytesLike(callData)) {
-      return makeResponse("Invalid request format", { status: 400 });
-    }
-
-    if (senders.length > 0 && !senders.includes(sender)) {
-      return makeResponse("Sender not supported", { status: 400 });
-    }
-
-    try {
-      const lookupResult = await ccipLookup(callData);
-      return makeResponse({ data: lookupResult }, { status: 200 });
-    } catch (e: any) {
-      console.log("THROWING ERROR", e.message);
-      return makeResponse(e.message, { status: 400 });
-    }
+    supportedSenders = env.SUPPORTED_SENDERS;
+    return app.handle(request).catch((e) => console.error(e));
   },
 };
