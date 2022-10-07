@@ -1,3 +1,7 @@
+import { Interface } from "@ethersproject/abi";
+
+const errorIface = new Interface(["error Error(tuple(uint16, string)[])"]);
+
 const ccipReadFetch = async (
   _sender: string,
   calldata: string,
@@ -10,7 +14,7 @@ const ccipReadFetch = async (
   const sender = _sender.toLowerCase();
   const data = calldata.toLowerCase();
 
-  const errorMessages: Array<string> = [];
+  const errorMessages: Array<[number, string]> = [];
 
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
@@ -26,18 +30,18 @@ const ccipReadFetch = async (
       method: json ? "POST" : "GET",
       headers: json ? { "Content-Type": "application/json" } : {},
       body: json,
-    }).then(
-      async (res) =>
-        ({
-          ...(await res.json()),
-          status: res.status,
-          statusText: res.statusText,
-        } as {
-          data: string | undefined;
-          status: number;
-          statusText: string | undefined;
-        })
-    );
+    }).then(async (res) => {
+      const retJson = await res.json<object>().catch(() => {});
+      return {
+        ...retJson,
+        status: res.status,
+        statusText: res.statusText,
+      } as {
+        data: string | undefined;
+        status: number;
+        statusText: string | undefined;
+      };
+    });
 
     if (result.data) return result.data;
 
@@ -45,35 +49,44 @@ const ccipReadFetch = async (
 
     // 4xx indicates the result is not present; stop
     if (result.status >= 400 && result.status < 500) {
-      throw new Error(`response not found during CCIP fetch: ${errorMessage}`);
+      throw errorIface.encodeErrorResult("Error", [
+        [[result.status, errorMessage]],
+      ]);
     }
 
     // 5xx indicates server issue; try the next url
-    errorMessages.push(errorMessage);
+    errorMessages.push([result.status, errorMessage]);
   }
 
-  throw new Error(
-    `error encountered during CCIP fetch: ${errorMessages
-      .map((m) => JSON.stringify(m))
-      .join(", ")}`
-  );
+  throw errorIface.encodeErrorResult("Error", [errorMessages]);
 };
 
 export const ccipLookup = async (callDatas: [string, string[], string][]) => {
+  const failures: boolean[] = Array.from(
+    { length: callDatas.length },
+    () => false
+  );
   const responses = await Promise.all(
-    callDatas.map(async ([wrappedSender, wrappedUrls, wrappedCallData]) => {
-      const ccipResult = await ccipReadFetch(
-        wrappedSender,
-        wrappedCallData,
-        wrappedUrls
-      );
-      if (ccipResult === null) {
-        throw new Error("CCIP Read provided no URLs");
-      }
+    callDatas.map(async ([wrappedSender, wrappedUrls, wrappedCallData], i) => {
+      try {
+        const ccipResult = await ccipReadFetch(
+          wrappedSender,
+          wrappedCallData,
+          wrappedUrls
+        );
+        if (ccipResult === null) {
+          throw errorIface.encodeErrorResult("Error", [
+            [[400, "No URLs provided"]],
+          ]);
+        }
 
-      return ccipResult;
+        return ccipResult;
+      } catch (e) {
+        failures[i] = true;
+        return e;
+      }
     })
   );
 
-  return responses;
+  return [failures, responses];
 };

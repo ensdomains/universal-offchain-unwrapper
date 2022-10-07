@@ -2,7 +2,7 @@ import { defaultAbiCoder, Fragment, FunctionFragment, Interface, JsonFragment, R
 import { isAddress } from '@ethersproject/address';
 import { BytesLike, hexlify, isBytesLike } from '@ethersproject/bytes';
 import { Router } from 'itty-router';
-import { handleCors, IRequest } from './utils/cors';
+import { handleCors, IRequest, wrapCorsHeader } from './utils/cors';
 
 export interface RPCCall {
   to: BytesLike;
@@ -139,19 +139,21 @@ export class Server {
     }
 
     if (!isAddress(sender) || !isBytesLike(callData)) {
-      return new Response('Invalid request format', { status: 400 });
+      return wrapCorsHeader(new Response('Invalid request format', { status: 400 }));
     }
 
     try {
       const response = await this.call({ to: sender, data: callData });
-      return new Response(JSON.stringify(response.body), {
-        status: response.status,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      return wrapCorsHeader(
+        new Response(JSON.stringify(response.body), {
+          status: response.status,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      );
     } catch (e) {
-      return new Response(`Internal server error: ${(e as any).toString()}`, { status: 500 });
+      return wrapCorsHeader(new Response(`Internal server error: ${(e as any).toString()}`, { status: 500 }));
     }
   }
 

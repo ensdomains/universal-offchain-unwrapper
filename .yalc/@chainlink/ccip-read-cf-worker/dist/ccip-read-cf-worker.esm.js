@@ -39,6 +39,24 @@ function _asyncToGenerator(fn) {
   };
 }
 
+function _extends() {
+  _extends = Object.assign || function (target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = arguments[i];
+
+      for (var key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          target[key] = source[key];
+        }
+      }
+    }
+
+    return target;
+  };
+
+  return _extends.apply(this, arguments);
+}
+
 function _unsupportedIterableToArray(o, minLen) {
   if (!o) return;
   if (typeof o === "string") return _arrayLikeToArray(o, minLen);
@@ -945,7 +963,7 @@ var Server = /*#__PURE__*/function () {
    */
   ;
 
-  _proto.makeApp = function makeApp(prefix) {
+  _proto.makeApp = function makeApp(prefix, cors) {
     var app = Router();
     app.get(prefix, function () {
       return new Response('hey ho!', {
@@ -958,16 +976,22 @@ var Server = /*#__PURE__*/function () {
      * e.g. return wrapCorsHeader(new Response('Invalid request format', { status: 400 }));
      */
 
-    app.options(prefix + ":sender/:callData", handleCors({
-      methods: 'GET',
-      maxAge: 86400
-    }));
     app.get(prefix + ":sender/:callData", this.handleRequest.bind(this));
-    app.options(prefix, handleCors({
-      methods: 'POST',
-      maxAge: 86400
-    }));
     app.post(prefix, this.handleRequest.bind(this));
+
+    if (cors) {
+      var corsOptions = _extends({
+        maxAge: 86400
+      }, typeof cors === 'boolean' ? {} : cors);
+
+      app.options(prefix + ":sender/:callData", handleCors(_extends({
+        methods: 'GET'
+      }, corsOptions)));
+      app.options(prefix, handleCors(_extends({
+        methods: 'POST'
+      }, corsOptions)));
+    }
+
     return app;
   };
 

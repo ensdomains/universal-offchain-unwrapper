@@ -6,7 +6,7 @@ let supportedSenders: string[] = [];
 
 const server = new Server();
 const abi = [
-  "function query(tuple(address,string[],bytes)[]) returns (bytes[])",
+  "function query(tuple(address,string[],bytes)[]) returns (bool[],bytes[])",
 ];
 server.add(abi, [
   {
@@ -19,7 +19,7 @@ server.add(abi, [
         throw new Error("Sender not supported");
       }
       const res = await ccipLookup(callDatas as [string, string[], string][]);
-      return [res];
+      return res;
     },
   },
 ]);

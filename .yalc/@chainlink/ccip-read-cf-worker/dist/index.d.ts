@@ -1,7 +1,7 @@
 import { Fragment, FunctionFragment, Interface, JsonFragment, Result } from '@ethersproject/abi';
 import { BytesLike } from '@ethersproject/bytes';
 import { Router } from 'itty-router';
-import { IRequest } from './utils/cors';
+import { InputCORSOptions, IRequest } from './utils/cors';
 export interface RPCCall {
     to: BytesLike;
     data: BytesLike;
@@ -82,7 +82,7 @@ export declare class Server {
      * in a smart contract would be "https://example.com/{sender}/{callData}.json".
      * @returns An `itty-router.Router` object configured to serve as a CCIP read gateway.
      */
-    makeApp(prefix: string): Router;
+    makeApp(prefix: string, cors?: InputCORSOptions | boolean): Router;
     handleRequest(req: IRequest): Promise<Response>;
     call(call: RPCCall): Promise<RPCResponse>;
 }
