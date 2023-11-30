@@ -36,13 +36,13 @@ export const ccipLookup = async (
           return encodeErrorResult({
             abi: errorAbi,
             errorName: "HttpError",
-            args: [[[e.status || 400, e.details]]],
+            args: [[[e.status || 500, e.details]]],
           });
         }
         return encodeErrorResult({
           abi: errorAbi,
           errorName: "HttpError",
-          args: [[[400, e instanceof BaseError ? e.details : "Unknown Error"]]],
+          args: [[[500, e instanceof BaseError ? e.details : "Unknown Error"]]],
         });
       }
     })
