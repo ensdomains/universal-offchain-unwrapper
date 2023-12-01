@@ -36,7 +36,7 @@ app.all("*", preflight);
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    supportedSenders = env.SUPPORTED_SENDERS;
+    supportedSenders = env.SUPPORTED_SENDERS || [];
     return app
       .handle(request)
       .catch((e) => {
