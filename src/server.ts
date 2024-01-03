@@ -1,12 +1,26 @@
-import { defaultAbiCoder, Fragment, FunctionFragment, Interface, JsonFragment, Result } from '@ethersproject/abi';
-import { isAddress } from '@ethersproject/address';
-import { BytesLike, hexlify, isBytesLike } from '@ethersproject/bytes';
-import { Router } from 'itty-router';
-import { handleCors, IRequest, wrapCorsHeader } from './utils/cors';
+import type {
+  Abi,
+  AbiFunction,
+  AbiParametersToPrimitiveTypes,
+  ExtractAbiFunction,
+  ExtractAbiFunctionNames,
+} from "abitype";
+import { IRequest, Router, RouterType } from "itty-router";
+import {
+  Address,
+  Hex,
+  InferItemName,
+  decodeFunctionData,
+  encodeFunctionResult,
+  getAbiItem,
+  getFunctionSelector,
+  isAddress,
+  isHex,
+} from "viem";
 
 export interface RPCCall {
-  to: BytesLike;
-  data: BytesLike;
+  to: Address;
+  data: Hex;
 }
 
 export interface RPCResponse {
@@ -14,24 +28,25 @@ export interface RPCResponse {
   body: any;
 }
 
-export type HandlerFunc = (args: Result, req: RPCCall) => Promise<Array<any>> | Array<any>;
+export type HandlerFunc<abiFunc extends AbiFunction> = (
+  args: AbiParametersToPrimitiveTypes<abiFunc["inputs"]>,
+  req: RPCCall
+) =>
+  | Promise<AbiParametersToPrimitiveTypes<abiFunc["outputs"]>>
+  | AbiParametersToPrimitiveTypes<abiFunc["outputs"]>;
 
-interface Handler {
-  type: FunctionFragment;
-  func: HandlerFunc;
-}
+type Handler<abiFunc extends AbiFunction> = {
+  type: abiFunc;
+  func: HandlerFunc<abiFunc>;
+};
 
-function toInterface(abi: string | readonly (string | Fragment | JsonFragment)[] | Interface) {
-  if (Interface.isInterface(abi)) {
-    return abi;
-  }
-  return new Interface(abi);
-}
-
-export interface HandlerDescription {
-  type: string;
-  func: HandlerFunc;
-}
+export type HandlerDescription<
+  abi extends Abi,
+  functionName extends ExtractAbiFunctionNames<abi> = ExtractAbiFunctionNames<abi>
+> = {
+  type: functionName | ExtractAbiFunctionNames<abi>;
+  func: HandlerFunc<ExtractAbiFunction<abi, functionName>>;
+};
 
 /**
  * Implements a Durin gateway service using itty-router.js.
@@ -63,7 +78,7 @@ export interface HandlerDescription {
  */
 export class Server {
   /** @ignore */
-  readonly handlers: { [selector: string]: Handler };
+  readonly handlers: { [selector: string]: Handler<AbiFunction> };
 
   /**
    * Constructs a new Durin gateway server instance.
@@ -78,15 +93,18 @@ export class Server {
    *        a 'Human Readable ABI', a JSON-format ABI, or an Ethers `Interface` object.
    * @param handlers An array of handlers to register against this interface.
    */
-  add(abi: string | readonly (string | Fragment | JsonFragment)[] | Interface, handlers: Array<HandlerDescription>) {
-    const abiInterface = toInterface(abi);
-
+  add<const abi extends Abi>(
+    abi: abi,
+    handlers: Array<HandlerDescription<abi>>
+  ) {
     for (const handler of handlers) {
-      const fn = abiInterface.getFunction(handler.type);
-
-      this.handlers[Interface.getSighash(fn)] = {
+      const fn = getAbiItem({
+        abi: abi as Abi,
+        name: handler.type as InferItemName<abi>,
+      }) as AbiFunction;
+      this.handlers[getFunctionSelector(fn)] = {
         type: fn,
-        func: handler.func,
+        func: handler.func as HandlerFunc<AbiFunction>,
       };
     }
   }
@@ -110,55 +128,55 @@ export class Server {
    * in a smart contract would be "https://example.com/{sender}/{callData}.json".
    * @returns An `itty-router.Router` object configured to serve as a CCIP read gateway.
    */
-  makeApp(prefix: string): Router {
+  makeApp(prefix: string): RouterType {
     const app = Router();
-    app.get(prefix, () => new Response('hey ho!', { status: 200 }));
-    /*
-     * uncomment app.options for cors
-     * also wrap responses with cors wrapper
-     * e.g. return wrapCorsHeader(new Response('Invalid request format', { status: 400 }));
-     */
-    app.options(`${prefix}:sender/:callData`, handleCors({ methods: 'GET', maxAge: 86400 }));
+    app.get(prefix, () => new Response("hey ho!", { status: 200 }));
     app.get(`${prefix}:sender/:callData`, this.handleRequest.bind(this));
-    app.options(prefix, handleCors({ methods: 'POST', maxAge: 86400 }));
     app.post(prefix, this.handleRequest.bind(this));
     return app;
   }
 
   async handleRequest(req: IRequest) {
-    let sender: string;
-    let callData: string;
+    let sender: string | undefined;
+    let callData: string | undefined;
 
-    if (req.method === 'GET') {
+    if (req.method === "GET") {
       sender = req.params.sender;
       callData = req.params.callData;
     } else {
-      const body = await req.json();
+      const body = await req.json<{ sender?: string; data?: string }>();
       sender = body.sender;
       callData = body.data;
     }
 
-    if (!isAddress(sender) || !isBytesLike(callData)) {
-      return wrapCorsHeader(new Response('Invalid request format', { status: 400 }));
+    if (!sender || !callData || !isAddress(sender) || !isHex(callData)) {
+      return new Response("Invalid request format", { status: 400 });
     }
 
     try {
       const response = await this.call({ to: sender, data: callData });
-      return wrapCorsHeader(
-        new Response(JSON.stringify(response.body), {
-          status: response.status,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-      );
+      return new Response(JSON.stringify(response.body), {
+        status: response.status,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     } catch (e) {
-      return wrapCorsHeader(new Response(`Internal server error: ${(e as any).toString()}`, { status: 500 }));
+      return new Response(
+        JSON.stringify({
+          data: {
+            error: `Internal server error: ${(e as any).toString()}`,
+          },
+        }),
+        {
+          status: 500,
+        }
+      );
     }
   }
 
   async call(call: RPCCall): Promise<RPCResponse> {
-    const calldata = hexlify(call.data);
+    const calldata = call.data;
     const selector = calldata.slice(0, 10).toLowerCase();
 
     // Find a function handler for this selector
@@ -166,21 +184,30 @@ export class Server {
     if (handler === undefined) {
       return {
         status: 404,
-        body: { message: `No implementation for function with selector ${selector}` },
+        body: {
+          data: {
+            error: `No implementation for function with selector ${selector}`,
+          },
+        },
       };
     }
 
     // Decode function arguments
-    const args = defaultAbiCoder.decode(handler.type.inputs, '0x' + calldata.slice(10));
+    const { args } = decodeFunctionData({
+      abi: [handler.type],
+      data: calldata,
+    });
 
     // Call the handler
-    const result = await handler.func(args, call);
+    const result = await handler.func(args!, call);
 
     // Encode return data
     return {
       status: 200,
       body: {
-        data: handler.type.outputs ? hexlify(defaultAbiCoder.encode(handler.type.outputs, result)) : '0x',
+        data: handler.type.outputs
+          ? encodeFunctionResult({ abi: [handler.type], result })
+          : "0x",
       },
     };
   }

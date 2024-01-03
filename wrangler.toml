@@ -5,3 +5,6 @@ node_compat = true
 
 [vars]
 SUPPORTED_SENDERS = []
+
+[env.v2.vars]
+SUPPORTED_SENDERS = []

@@ -1,13 +1,20 @@
-import { Server } from "@chainlink/ccip-read-cf-worker/src";
+import { createCors, error } from "itty-router";
+import { parseAbi } from "viem";
 import { ccipLookup } from "./ccip";
+import { Server } from "./server";
 import { Env } from "./types";
+
+const { preflight, corsify } = createCors({
+  origins: ["*"],
+  methods: ["GET", "POST", "PATCH", "DELETE"],
+});
 
 let supportedSenders: string[] = [];
 
 const server = new Server();
-const abi = [
-  "function query(tuple(address,string[],bytes)[]) returns (bool[],bytes[])",
-];
+const abi = parseAbi([
+  "function query((address,string[],bytes)[]) returns (bool[],bytes[])",
+]);
 server.add(abi, [
   {
     type: "query",
@@ -18,16 +25,24 @@ server.add(abi, [
       ) {
         throw new Error("Sender not supported");
       }
-      const res = await ccipLookup(callDatas as [string, string[], string][]);
+      const res = await ccipLookup(callDatas);
       return res;
     },
   },
 ]);
 const app = server.makeApp("/");
 
+app.all("*", preflight);
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    supportedSenders = env.SUPPORTED_SENDERS;
-    return app.handle(request).catch((e) => console.error(e));
+    supportedSenders = env.SUPPORTED_SENDERS || [];
+    return app
+      .handle(request)
+      .catch((e) => {
+        console.error(e);
+        return error(e);
+      })
+      .then(corsify);
   },
 };
