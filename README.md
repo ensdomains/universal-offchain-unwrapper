@@ -42,7 +42,7 @@ Once the deployment is successful, you can use the endpoint with the UniversalRe
 - `function resolve(bytes name, bytes[] data, string[] gateways) view returns (tuple(bool,bytes)[], address)`
 - `function reverse(bytes reverseName, string[] gateways) view returns (string, address, address, address)`
 
-Alternatively, you can also use the gateway with [viem](https://viem.sh)'s ENS-related functions, or within [ENSjs](https://github.com/ensdomains/ensjs-v3).
+Alternatively, you can also use the gateway with [viem](https://viem.sh)'s ENS-related functions (TBD), or within [ENSjs](https://github.com/ensdomains/ensjs-v3).
 
 ## Customization
 
