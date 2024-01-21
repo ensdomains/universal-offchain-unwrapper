@@ -30,9 +30,7 @@ server.add(abi, [
     },
   },
 ]);
-const app = server.makeApp("/");
-
-app.all("*", preflight);
+const app = server.makeApp("/", preflight);
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

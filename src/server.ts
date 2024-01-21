@@ -5,7 +5,7 @@ import type {
   ExtractAbiFunction,
   ExtractAbiFunctionNames,
 } from "abitype";
-import { IRequest, Router, RouterType } from "itty-router";
+import { IRequest, RouteHandler, Router, RouterType } from "itty-router";
 import {
   Address,
   Hex,
@@ -128,8 +128,11 @@ export class Server {
    * in a smart contract would be "https://example.com/{sender}/{callData}.json".
    * @returns An `itty-router.Router` object configured to serve as a CCIP read gateway.
    */
-  makeApp(prefix: string): RouterType {
+  makeApp(prefix: string, preflight?: RouteHandler): RouterType {
     const app = Router();
+    if (preflight) {
+      app.all("*", preflight);
+    }
     app.get(prefix, () => new Response("hey ho!", { status: 200 }));
     app.get(`${prefix}:sender/:callData`, this.handleRequest.bind(this));
     app.post(prefix, this.handleRequest.bind(this));
