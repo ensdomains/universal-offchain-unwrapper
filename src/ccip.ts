@@ -14,50 +14,47 @@ type ReadonlyDeep<T> = {
 
 const errorAbi = parseAbi(["error HttpError((uint16, string)[])"]);
 
-const createCcipRequestItemHandler =
-  (failures: boolean[]) =>
-  async (
-    [wrappedSender, wrappedUrls, wrappedCallData]: [
-      Address,
-      readonly string[],
-      Hex
-    ],
-    i: number
-  ) => {
-    try {
-      const ccipResult = await ccipFetch({
-        sender: wrappedSender,
-        urls: wrappedUrls,
-        data: wrappedCallData,
-      });
-      return ccipResult;
-    } catch (e) {
-      failures[i] = true;
-      if (e instanceof HttpRequestError) {
-        return encodeErrorResult({
+type CcipRequestItem = [success: boolean, result: Hex];
+
+const ccipRequestItemHandler = async ([
+  wrappedSender,
+  wrappedUrls,
+  wrappedCallData,
+]: [Address, readonly string[], Hex]): Promise<CcipRequestItem> => {
+  try {
+    const ccipResult = await ccipFetch({
+      sender: wrappedSender,
+      urls: wrappedUrls,
+      data: wrappedCallData,
+    });
+    return [false, ccipResult];
+  } catch (e) {
+    if (e instanceof HttpRequestError) {
+      return [
+        true,
+        encodeErrorResult({
           abi: errorAbi,
           errorName: "HttpError",
           args: [[[e.status || 500, e.details]]],
-        });
-      }
-      return encodeErrorResult({
+        }),
+      ];
+    }
+    return [
+      true,
+      encodeErrorResult({
         abi: errorAbi,
         errorName: "HttpError",
         args: [[[500, e instanceof BaseError ? e.details : "Unknown Error"]]],
-      });
-    }
-  };
+      }),
+    ];
+  }
+};
 
 export const ccipLookup = async (
   callDatas: ReadonlyDeep<[Address, string[], Hex][]>
 ) => {
-  const failures: boolean[] = Array.from(
-    { length: callDatas.length },
-    () => false
-  );
-  const ccipRequestCache: Map<string, Promise<Hex>> = new Map();
-  const ccipRequestItemHandler = createCcipRequestItemHandler(failures);
-  const responsePromises: Promise<Hex>[] = [];
+  const ccipRequestCache: Map<string, Promise<CcipRequestItem>> = new Map();
+  const responsePromises: Promise<CcipRequestItem>[] = [];
 
   for (let i = 0; i < callDatas.length; i += 1) {
     const [wrappedSender, wrappedUrls, wrappedCallData] = callDatas[i];
@@ -73,15 +70,23 @@ export const ccipLookup = async (
       continue;
     }
 
-    const ccipRequest = ccipRequestItemHandler(
-      [wrappedSender, wrappedUrls, wrappedCallData],
-      i
-    );
+    const ccipRequest = ccipRequestItemHandler([
+      wrappedSender,
+      wrappedUrls,
+      wrappedCallData,
+    ]);
     ccipRequestCache.set(requestId, ccipRequest);
     responsePromises.push(ccipRequest);
   }
 
-  const responses = await Promise.all(responsePromises);
+  const awaitedResponses = await Promise.all(responsePromises);
 
-  return [failures, responses] as const;
+  return awaitedResponses.reduce(
+    ([failures, responses], [failure, response], i) => {
+      failures[i] = failure;
+      responses[i] = response;
+      return [failures, responses] as [failures: boolean[], responses: Hex[]];
+    },
+    [[], []] as [failures: boolean[], responses: Hex[]]
+  );
 };
