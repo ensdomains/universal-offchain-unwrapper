@@ -8,3 +8,6 @@ SUPPORTED_SENDERS = []
 
 [env.v2.vars]
 SUPPORTED_SENDERS = []
+
+[env.v3.vars]
+SUPPORTED_SENDERS = []

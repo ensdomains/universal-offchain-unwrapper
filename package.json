@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "wrangler dev",
-    "deploy": "wrangler deploy -e v2"
+    "deploy": "wrangler deploy -e v3"
   },
   "dependencies": {
     "abitype": "^0.10.3",

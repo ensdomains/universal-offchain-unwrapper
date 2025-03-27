@@ -12,7 +12,7 @@ type ReadonlyDeep<T> = {
   readonly [P in keyof T]: ReadonlyDeep<T[P]>;
 };
 
-const errorAbi = parseAbi(["error HttpError((uint16, string)[])"]);
+const errorAbi = parseAbi(["error HttpError(uint16, string)"]);
 
 type CcipRequestItem = [success: boolean, result: Hex];
 
@@ -35,7 +35,7 @@ const ccipRequestItemHandler = async ([
         encodeErrorResult({
           abi: errorAbi,
           errorName: "HttpError",
-          args: [[[e.status || 500, e.details]]],
+          args: [e.status || 500, e.details],
         }),
       ];
     }
@@ -44,7 +44,7 @@ const ccipRequestItemHandler = async ([
       encodeErrorResult({
         abi: errorAbi,
         errorName: "HttpError",
-        args: [[[500, e instanceof BaseError ? e.details : "Unknown Error"]]],
+        args: [500, e instanceof BaseError ? e.details : "Unknown Error"],
       }),
     ];
   }
